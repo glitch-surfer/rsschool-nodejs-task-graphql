@@ -1,9 +1,19 @@
-import { FastifyPluginAsyncTypebox } from '@fastify/type-provider-typebox';
-import { createGqlResponseSchema, gqlResponseSchema } from './schemas.js';
-import { graphql } from 'graphql';
+/* eslint-disable @typescript-eslint/no-misused-promises,@typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-explicit-any */
+import {FastifyPluginAsyncTypebox} from '@fastify/type-provider-typebox';
+import {createGqlResponseSchema, gqlResponseSchema} from './schemas.js';
+import {graphql, GraphQLEnumType, GraphQLFloat, GraphQLScalarType, Kind} from 'graphql';
+import {
+    GraphQLBoolean,
+    GraphQLInt,
+    GraphQLList,
+    GraphQLNonNull,
+    GraphQLObjectType,
+    GraphQLSchema,
+    GraphQLString
+} from "graphql/type/index.js";
 
 const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
-  const { prisma } = fastify;
+    const {prisma} = fastify;
 
     const UUIDScalar = new GraphQLScalarType({
         name: 'UUID',
@@ -137,7 +147,95 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
         },
     });
 
+//todo fix
+    const MutationType = new GraphQLObjectType({
+        name: 'Mutation',
+        fields: {
+            createPost: {
+                type: PostType,
+                args: {
+                    title: {type: new GraphQLNonNull(GraphQLString)},
+                    content: {type: new GraphQLNonNull(GraphQLString)},
+                    authorId: {type: new GraphQLNonNull(GraphQLString)},
+                },
+                resolve: (_, args) => prisma.post.create({data: args}),
+            },
+            updatePost: {
+                type: PostType,
+                args: {
+                    id: {type: new GraphQLNonNull(GraphQLString)},
+                    title: {type: GraphQLString},
+                    content: {type: GraphQLString},
+                },
+                resolve: (_, {id, ...args}: { id: string }) => prisma.post.update({where: {id}, data: args}),
+            },
+            deletePost: {
+                type: PostType,
+                args: {id: {type: new GraphQLNonNull(GraphQLString)}},
+                resolve: (_, {id}: { id: string }) => prisma.post.delete({where: {id}}),
+            },
+            createProfile: {
+                type: ProfileType,
+                args: {
+                    isMale: {type: new GraphQLNonNull(GraphQLBoolean)},
+                    yearOfBirth: {type: new GraphQLNonNull(GraphQLInt)},
+                    userId: {type: new GraphQLNonNull(GraphQLString)},
+                    memberTypeId: {type: new GraphQLNonNull(GraphQLString)},
+                },
+                resolve: (_, args) => prisma.profile.create({data: args}),
+            },
+            updateProfile: {
+                type: ProfileType,
+                args: {
+                    id: {type: new GraphQLNonNull(GraphQLString)},
+                    isMale: {type: GraphQLBoolean},
+                    yearOfBirth: {type: GraphQLInt},
+                    memberTypeId: {type: GraphQLString},
+                },
+                resolve: (_, {id, ...args}: { id: string }) => prisma.profile.update({where: {id}, data: args}),
+            },
+            deleteProfile: {
+                type: ProfileType,
+                args: {id: {type: new GraphQLNonNull(GraphQLString)}},
+                resolve: (_, {id}: { id: string }) => prisma.profile.delete({where: {id}}),
+            },
+        },
+    });
 
+    const schema = new GraphQLSchema({
+        query: QueryType,
+        mutation: MutationType,
+    });
+
+    fastify.route({
+        url: '/',
+        method: 'POST',
+        schema: {
+            ...createGqlResponseSchema,
+            response: {
+                200: gqlResponseSchema,
+            },
+        },
+        async handler(req) {
+            const {query, variables} = req.body as { query: string; variables?: Record<string, string> };
+            const result = await graphql({
+                schema,
+                source: query,
+                variableValues: variables,
+                contextValue: {prisma},
+            });
+
+            return {
+                data: result.data || null,
+                errors: result.errors ? result.errors.map(e => ({
+                    message: e.message,
+                    locations: e.locations,
+                    path: e.path,
+                    extensions: e.extensions,
+                })) : undefined
+            }
+        },
+    });
 };
 
 export default plugin;
