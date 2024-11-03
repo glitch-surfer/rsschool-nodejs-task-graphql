@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-misused-promises,@typescript-eslint/no-unsafe-assignment,@typescript-eslint/no-unsafe-member-access,@typescript-eslint/no-explicit-any */
 import {FastifyPluginAsyncTypebox} from '@fastify/type-provider-typebox';
 import {createGqlResponseSchema, gqlResponseSchema} from './schemas.js';
-import {graphql, GraphQLEnumType, GraphQLFloat, GraphQLScalarType, Kind} from 'graphql';
+import {graphql, GraphQLEnumType, GraphQLFloat, GraphQLInputObjectType, GraphQLScalarType, Kind} from 'graphql';
 import {
     GraphQLBoolean,
     GraphQLInt,
@@ -205,50 +205,111 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
             createPost: {
                 type: PostType,
                 args: {
-                    title: {type: new GraphQLNonNull(GraphQLString)},
-                    content: {type: new GraphQLNonNull(GraphQLString)},
-                    authorId: {type: new GraphQLNonNull(GraphQLString)},
+                    dto: {type: new GraphQLNonNull(CreatePostInput)},
                 },
-                resolve: (_, args) => prisma.post.create({data: args}),
+                resolve: (_, {dto}) => prisma.post.create({data: dto}),
             },
-            updatePost: {
-                type: PostType,
+            createUser: {
+                type: UserType,
                 args: {
-                    id: {type: new GraphQLNonNull(GraphQLString)},
-                    title: {type: GraphQLString},
-                    content: {type: GraphQLString},
+                    dto: {type: new GraphQLNonNull(CreateUserInput)},
                 },
-                resolve: (_, {id, ...args}: { id: string }) => prisma.post.update({where: {id}, data: args}),
-            },
-            deletePost: {
-                type: PostType,
-                args: {id: {type: new GraphQLNonNull(GraphQLString)}},
-                resolve: (_, {id}: { id: string }) => prisma.post.delete({where: {id}}),
+                resolve: (_, {dto}) => prisma.user.create({data: dto}),
             },
             createProfile: {
                 type: ProfileType,
                 args: {
-                    isMale: {type: new GraphQLNonNull(GraphQLBoolean)},
-                    yearOfBirth: {type: new GraphQLNonNull(GraphQLInt)},
-                    userId: {type: new GraphQLNonNull(GraphQLString)},
-                    memberTypeId: {type: new GraphQLNonNull(GraphQLString)},
+                    dto: {type: new GraphQLNonNull(CreateProfileInput)},
                 },
-                resolve: (_, args) => prisma.profile.create({data: args}),
+                resolve: (_, {dto}) => prisma.profile.create({data: dto}),
             },
-            updateProfile: {
-                type: ProfileType,
+            deletePost: {
+                type: GraphQLBoolean,
                 args: {
-                    id: {type: new GraphQLNonNull(GraphQLString)},
-                    isMale: {type: GraphQLBoolean},
-                    yearOfBirth: {type: GraphQLInt},
-                    memberTypeId: {type: GraphQLString},
+                    id: {type: new GraphQLNonNull(UUIDScalar)},
                 },
-                resolve: (_, {id, ...args}: { id: string }) => prisma.profile.update({where: {id}, data: args}),
+                resolve: async (_, {id}) => {
+                    await prisma.post.delete({where: {id}});
+                    return true;
+                },
             },
             deleteProfile: {
+                type: GraphQLBoolean,
+                args: {
+                    id: {type: new GraphQLNonNull(UUIDScalar)},
+                },
+                resolve: async (_, {id}) => {
+                    await prisma.profile.delete({where: {id}});
+                    return true;
+                },
+            },
+            deleteUser: {
+                type: GraphQLBoolean,
+                args: {
+                    id: {type: new GraphQLNonNull(UUIDScalar)},
+                },
+                resolve: async (_, {id}) => {
+                    await prisma.user.delete({where: {id}});
+                    return true;
+                },
+            },
+            changePost: {
+                type: PostType,
+                args: {
+                    id: {type: new GraphQLNonNull(UUIDScalar)},
+                    dto: {type: new GraphQLNonNull(ChangePostInput)},
+                },
+                resolve: (_, {id, dto}) => prisma.post.update({where: {id}, data: dto}),
+            },
+            changeProfile: {
                 type: ProfileType,
-                args: {id: {type: new GraphQLNonNull(GraphQLString)}},
-                resolve: (_, {id}: { id: string }) => prisma.profile.delete({where: {id}}),
+                args: {
+                    id: {type: new GraphQLNonNull(UUIDScalar)},
+                    dto: {type: new GraphQLNonNull(ChangeProfileInput)},
+                },
+                resolve: (_, {id, dto}) => prisma.profile.update({where: {id}, data: dto}),
+            },
+            changeUser: {
+                type: UserType,
+                args: {
+                    id: {type: new GraphQLNonNull(UUIDScalar)},
+                    dto: {type: new GraphQLNonNull(ChangeUserInput)},
+                },
+                resolve: (_, {id, dto}) => prisma.user.update({where: {id}, data: dto}),
+            },
+            subscribeTo: {
+                type: GraphQLBoolean,
+                args: {
+                    userId: {type: new GraphQLNonNull(UUIDScalar)},
+                    authorId: {type: new GraphQLNonNull(UUIDScalar)},
+                },
+                resolve: async (_, {userId, authorId}) => {
+                    await prisma.subscribersOnAuthors.create({
+                        data: {
+                            subscriberId: userId,
+                            authorId: authorId,
+                        },
+                    });
+                    return true;
+                },
+            },
+            unsubscribeFrom: {
+                type: GraphQLBoolean,
+                args: {
+                    userId: {type: new GraphQLNonNull(UUIDScalar)},
+                    authorId: {type: new GraphQLNonNull(UUIDScalar)},
+                },
+                resolve: async (_, {userId, authorId}) => {
+                    await prisma.subscribersOnAuthors.delete({
+                        where: {
+                            subscriberId_authorId: {
+                                subscriberId: userId,
+                                authorId: authorId,
+                            },
+                        },
+                    });
+                    return true;
+                },
             },
         },
     });
