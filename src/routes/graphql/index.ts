@@ -5,19 +5,6 @@ import { graphql } from 'graphql';
 const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
   const { prisma } = fastify;
 
-  fastify.route({
-    url: '/',
-    method: 'POST',
-    schema: {
-      ...createGqlResponseSchema,
-      response: {
-        200: gqlResponseSchema,
-      },
-    },
-    async handler(req) {
-      // return graphql();
-    },
-  });
     const UUIDScalar = new GraphQLScalarType({
         name: 'UUID',
         description: 'A UUID string',
@@ -107,6 +94,49 @@ const plugin: FastifyPluginAsyncTypebox = async (fastify) => {
             },
         }),
     });
+
+    const QueryType = new GraphQLObjectType({
+        name: 'Query',
+        fields: {
+            memberTypes: {
+                type: new GraphQLList(MemberTypeType),
+                resolve: () => prisma.memberType.findMany(),
+            },
+            memberType: {
+                type: MemberTypeType,
+                args: {id: {type: new GraphQLNonNull(MemberTypeIdEnum)}},
+                resolve: (_, {id}) => prisma.memberType.findUnique({where: {id}}),
+            },
+            posts: {
+                type: new GraphQLList(PostType),
+                resolve: () => prisma.post.findMany(),
+            },
+            post: {
+                type: PostType,
+                args: {id: {type: new GraphQLNonNull(UUIDScalar)}},
+                resolve: (_, {id}) => prisma.post.findUnique({where: {id}}),
+            },
+            profiles: {
+                type: new GraphQLList(ProfileType),
+                resolve: () => prisma.profile.findMany(),
+            },
+            profile: {
+                type: ProfileType,
+                args: {id: {type: new GraphQLNonNull(UUIDScalar)}},
+                resolve: (_, {id}) => prisma.profile.findUnique({where: {id}}),
+            },
+            users: {
+                type: new GraphQLList(UserType),
+                resolve: () => prisma.user.findMany(),
+            },
+            user: {
+                type: UserType,
+                args: {id: {type: new GraphQLNonNull(UUIDScalar)}},
+                resolve: (_, {id}) => prisma.user.findUnique({where: {id}}),
+            },
+        },
+    });
+
 
 };
 
